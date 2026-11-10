@@ -7,7 +7,7 @@ const express = require('express'); // For Render keep-alive
 // ==========================================
 // CONFIGURATION
 // ==========================================
-const OPENROUTER_API_KEY = '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'; 
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY; 
 const OWNER_JID = process.env.OWNER_JID || '256780323452@s.whatsapp.net'; 
 
 const openai = new OpenAI({
