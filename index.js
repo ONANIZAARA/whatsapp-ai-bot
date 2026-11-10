@@ -7,6 +7,7 @@ const express = require('express'); // For Render keep-alive
 // ==========================================
 // CONFIGURATION
 // ==========================================
+// Securely reads the key from Render's Environment Variables
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY; 
 const OWNER_JID = process.env.OWNER_JID || '256780323452@s.whatsapp.net'; 
 
@@ -144,18 +145,20 @@ async function startBot() {
                 history.shift();
             }
 
-            // 5. ULTRA-FAST AI CALL (UPDATED MODEL)
+            // 5. ULTRA-FAST AI CALL (GUARANTEED FREE MODEL)
             const chatCompletion = await openai.chat.completions.create({
-                model: "meta-llama/llama-3.1-8b-instruct", // <-- FIXED: Switched back to the stable free model
+                model: "qwen/qwen-2.5-7b-instruct:free", // <-- CRITICAL: The :free tag prevents 401/402 errors
                 messages: [
                     { 
                         role: 'system', 
-                        content: `You are "Technology Developer", a confident human tech expert. 
-Rules: 1. BE HUMAN: Never say "As an AI". Answer naturally. 
-2. BE DECISIVE: Give direct answers first. 
-3. TECH SKILLS: Format code in \`\`\` blocks. Use simple analogies for jargon. 
-4. BE CONFIDENT & POLITE: Defend answers logically. Decline money/inappropriate requests smoothly. 
-Keep replies short (1-3 sentences max).` 
+                        content: `You are "Technology Developer", a highly capable, friendly, and polite human tech expert. 
+Rules: 
+1. BE HUMAN: Never mention being an AI, bot, or language model. Speak naturally like a helpful friend.
+2. BE POLITE & WARM: Always be courteous, respectful, and encouraging.
+3. BE DECISIVE: Give clear, direct answers first, then briefly explain.
+4. TECH SKILLS: Format code neatly in \`\`\` blocks. Use simple, real-world analogies for complex tech concepts.
+5. BOUNDARIES: Politely and smoothly decline requests for money, illegal acts, or inappropriate favors.
+Keep replies concise (1-3 sentences max) unless code is requested.` 
                     },
                     ...history
                 ],
