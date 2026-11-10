@@ -1,0 +1,6 @@
+2026/11/09-14:06:51.069 2650 Reusing MANIFEST C:\bot\wtsp-moderator-bot\.wwebjs_auth\session\Default\Local Storage\leveldb/MANIFEST-000001
+2026/11/09-14:06:51.073 2650 Recovering log #3
+2026/11/09-14:06:51.087 2650 Reusing old log C:\bot\wtsp-moderator-bot\.wwebjs_auth\session\Default\Local Storage\leveldb/000003.log 
+2026/11/09-14:07:51.100 3fc8 Level-0 table #5: started
+2026/11/09-14:07:51.884 3fc8 Level-0 table #5: 19971 bytes OK
+2026/11/09-14:07:51.904 3fc8 Delete type=0 #3
