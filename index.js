@@ -2,15 +2,13 @@ const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = requi
 const qrcode = require('qrcode-terminal');
 const pino = require('pino');
 const OpenAI = require('openai'); 
-   const express = require('express');
+const express = require('express'); // For Render keep-alive
 
 // ==========================================
 // CONFIGURATION
 // ==========================================
-const OPENROUTER_API_KEY = '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'; 
-
-// ⚠️ PUT YOUR REAL NUMBER HERE (No + sign, no spaces) ⚠️
-const OWNER_JID = '256780323452@s.whatsapp.net'; 
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || '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'; 
+const OWNER_JID = process.env.OWNER_JID || '256780323452@s.whatsapp.net'; 
 
 const openai = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
@@ -19,6 +17,7 @@ const openai = new OpenAI({
 
 const conversationHistory = new Map();
 const pausedChats = new Set(); 
+const replyAllGroups = new Set(); // Tracks groups where bot replies to everything
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState('./auth_info');
@@ -56,9 +55,7 @@ async function startBot() {
         const senderJid = message.key.participant || chatId;
         const isGroup = chatId.endsWith('@g.us');
         
-        // ==========================================
-        // 1. ROBUST TEXT EXTRACTION (Moved to the top)
-        // ==========================================
+        // 1. ROBUST TEXT EXTRACTION
         let text = '';
         if (message.message.conversation) {
             text = message.message.conversation;
@@ -73,13 +70,10 @@ async function startBot() {
         if (!text) return;
         const cleanText = text.trim().toLowerCase();
 
-        // ==========================================
         // 2. THE "FROM ME" FIX (Allows commands, blocks loops)
-        // ==========================================
-        // If the message is from your own account, ONLY process it if it's a command.
-        // This prevents the bot from replying to itself, but lets you use /pause.
         if (message.key.fromMe) {
-            if (cleanText !== '/pause' && cleanText !== '/resume' && cleanText !== '/clear') {
+            const allowedCommands = ['/pause', '/resume', '/clear', '/replyall', '/replymention'];
+            if (!allowedCommands.includes(cleanText)) {
                 return; 
             }
         }
@@ -89,9 +83,7 @@ async function startBot() {
         const ownerNumber = OWNER_JID.split('@')[0].split(':')[0];  
         const isOwner = senderNumber === ownerNumber;
 
-        // ==========================================
         // 3. OWNER COMMANDS
-        // ==========================================
         if (isOwner || message.key.fromMe) {
             if (cleanText === '/pause') {
                 pausedChats.add(chatId);
@@ -108,14 +100,26 @@ async function startBot() {
                 await sock.sendMessage(chatId, { text: "🧠 Memory cleared. Let's start fresh!" });
                 return;
             }
+            if (cleanText === '/replyall') {
+                if (isGroup) {
+                    replyAllGroups.add(chatId);
+                    await sock.sendMessage(chatId, { text: "✅ I will now reply to every message in this group." });
+                } else {
+                    await sock.sendMessage(chatId, { text: "This command only works in groups." });
+                }
+                return;
+            }
+            if (cleanText === '/replymention') {
+                replyAllGroups.delete(chatId);
+                await sock.sendMessage(chatId, { text: "✅ Reverted. I will only reply when mentioned in this group." });
+                return;
+            }
         }
 
         if (pausedChats.has(chatId)) return;
 
-        // ==========================================
         // 4. THE SMART FILTER (Groups vs Inbox)
-        // ==========================================
-        if (isGroup) {
+        if (isGroup && !replyAllGroups.has(chatId)) {
             const mentionedJid = message.message?.extendedTextMessage?.contextInfo?.mentionedJid || [];
             const botJid = sock.user?.id?.split(':')[0] + '@s.whatsapp.net'; 
             const isNativeMention = mentionedJid.includes(botJid);
@@ -136,29 +140,27 @@ async function startBot() {
 
             history.push({ role: 'user', content: text });
 
-            if (history.length > 8) {
+            if (history.length > 5) {
                 history.shift();
             }
 
+            // 5. ULTRA-FAST AI CALL (UPDATED MODEL)
             const chatCompletion = await openai.chat.completions.create({
-                model: "meta-llama/llama-3.1-8b-instruct", 
+                model: "meta-llama/llama-3.1-8b-instruct", // <-- FIXED: Switched back to the stable free model
                 messages: [
                     { 
                         role: 'system', 
-                        content: `You are "Technology Developer", a highly capable, confident, and natural-sounding human tech expert. 
-                        Your core rules are:
-                        1. BE HUMAN: Never say "As an AI..." or "I am a bot". Answer casual questions naturally.
-                        2. BE DECISIVE: Give clear, definitive answers FIRST, then briefly explain.
-                        3. TECH SKILLS - CODE: When asked for code, ALWAYS format it perfectly using WhatsApp markdown code blocks (e.g., \`\`\`javascript [code] \`\`\`).
-                        4. TECH SKILLS - JARGON: Use simple, real-world analogies for complex tech concepts.
-                        5. BE CONFIDENT: Defend your answer logically and politely.
-                        6. BE POLITE BUT FIRM: Decline requests for money or inappropriate favors smoothly.
-                        Act exactly like a smart, reliable, and friendly human expert.` 
+                        content: `You are "Technology Developer", a confident human tech expert. 
+Rules: 1. BE HUMAN: Never say "As an AI". Answer naturally. 
+2. BE DECISIVE: Give direct answers first. 
+3. TECH SKILLS: Format code in \`\`\` blocks. Use simple analogies for jargon. 
+4. BE CONFIDENT & POLITE: Defend answers logically. Decline money/inappropriate requests smoothly. 
+Keep replies short (1-3 sentences max).` 
                     },
                     ...history
                 ],
-                temperature: 0.75,
-                max_tokens: 300,
+                temperature: 0.7,
+                max_tokens: 150, 
             });
 
             const response = chatCompletion.choices[0]?.message?.content || "Sorry, I couldn't think of a reply!";
@@ -175,8 +177,11 @@ async function startBot() {
 }
 
 startBot();
-   // Keep-Alive Server for Render
-   const app = express();
-   const PORT = process.env.PORT || 3000;
-   app.get('/', (req, res) => res.send('Bot is running 24/7! 🤖'));
-   app.listen(PORT, () => console.log(`🌐 Keep-alive server running on port ${PORT}`));
+
+// ==========================================
+// KEEP-ALIVE SERVER FOR RENDER
+// ==========================================
+const app = express();
+const PORT = process.env.PORT || 3000;
+app.get('/', (req, res) => res.send('Bot is running 24/7! 🤖'));
+app.listen(PORT, () => console.log(`🌐 Keep-alive server running on port ${PORT}`));
