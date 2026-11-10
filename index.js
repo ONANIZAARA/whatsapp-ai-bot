@@ -2,6 +2,7 @@ const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = requi
 const qrcode = require('qrcode-terminal');
 const pino = require('pino');
 const OpenAI = require('openai'); 
+   const express = require('express');
 
 // ==========================================
 // CONFIGURATION
@@ -174,3 +175,8 @@ async function startBot() {
 }
 
 startBot();
+   // Keep-Alive Server for Render
+   const app = express();
+   const PORT = process.env.PORT || 3000;
+   app.get('/', (req, res) => res.send('Bot is running 24/7! 🤖'));
+   app.listen(PORT, () => console.log(`🌐 Keep-alive server running on port ${PORT}`));
