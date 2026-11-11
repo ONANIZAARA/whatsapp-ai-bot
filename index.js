@@ -146,9 +146,9 @@ async function startBot() {
             }
 
             // 5. ULTRA-FAST AI CALL (GUARANTEED FREE MODEL)
-            const chatCompletion = await openai.chat.completions.create({
-                model: "qwen/qwen-2.5-7b-instruct:free", // <-- CRITICAL: The :free tag prevents 401/402 errors
-                messages: [
+const chatCompletion = await openai.chat.completions.create({
+    model: "meta-llama/llama-3.2-3b-instruct:free", // <-- CHANGED TO STABLE FREE MODEL
+    messages: [
                     { 
                         role: 'system', 
                         content: `You are "Technology Developer", a highly capable, friendly, and polite human tech expert. 
